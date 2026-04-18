@@ -49,20 +49,21 @@ jobs:
           sudo apt update -y
           sudo apt install -y awscli
 
-          aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $ECR_REGISTRY
+          # Login to ECR
+          aws ecr get-login-password --region us-east-1 | sudo docker login --username AWS --password-stdin $ECR_REGISTRY
 
-          # Stop & remove old container safely
-          docker stop construction-genai || true
-          docker rm -f construction-genai || true
+          # Stop & remove old container
+          sudo docker stop construction-genai || true
+          sudo docker rm -f construction-genai || true
 
           # Free port if stuck
           sudo fuser -k 8501/tcp || true
 
           # Pull latest image
-          docker pull $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          sudo docker pull $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
           # Run container
-          docker run -d \
+          sudo docker run -d \
             -p 8501:8501 \
             --name construction-genai \
             --restart unless-stopped \
