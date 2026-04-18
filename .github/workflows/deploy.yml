@@ -46,16 +46,29 @@ jobs:
         chmod 600 deploy_key
         
         ssh -o StrictHostKeyChecking=no -i deploy_key ubuntu@$EC2_HOST << EOF
-          # Login to ECR using instance profile (recommended)
-          aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $ECR_REGISTRY
-          
+          sudo apt update -y
+          sudo apt install -y unzip curl
+
+          # Install AWS CLI (reliable way)
+          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+          unzip -o awscliv2.zip
+          sudo ./aws/install
+
+          # Login to ECR
+          sudo aws ecr get-login-password --region us-east-1 | sudo docker login --username AWS --password-stdin $ECR_REGISTRY
+
           # Stop and remove old container
-          docker stop construction-genai || true
-          docker rm -f construction-genai || true
-          
-          # Pull and run new image
-          docker pull $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          docker run -d \
+          sudo docker stop construction-genai || true
+          sudo docker rm -f construction-genai || true
+
+          # Free port if stuck
+          sudo fuser -k 8501/tcp || true
+
+          # Pull latest image
+          sudo docker pull $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+          # Run container
+          sudo docker run -d \
             --name construction-genai \
             -p 8501:8501 \
             --restart unless-stopped \
