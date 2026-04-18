@@ -14,10 +14,10 @@ jobs:
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v2
+      uses: aws-actions/configure-aws-credentials@v4
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -25,12 +25,12 @@ jobs:
 
     - name: Login to Amazon ECR
       id: login-ecr
-      uses: aws-actions/amazon-ecr-login@v1
+      uses: aws-actions/amazon-ecr-login@v2
 
     - name: Build and push Docker image
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        IMAGE_TAG: latest
+        IMAGE_TAG: ${{ github.sha }}
       run: |
         docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
@@ -38,7 +38,7 @@ jobs:
     - name: Deploy to EC2
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        IMAGE_TAG: latest
+        IMAGE_TAG: ${{ github.sha }}
         SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
         EC2_HOST: ${{ secrets.EC2_HOST }}
       run: |
@@ -46,28 +46,20 @@ jobs:
         chmod 600 deploy_key
         
         ssh -o StrictHostKeyChecking=no -i deploy_key ubuntu@$EC2_HOST << EOF
-          sudo apt update -y
-          sudo apt install -y awscli
-
-          # Login to ECR
-          aws ecr get-login-password --region us-east-1 | sudo docker login --username AWS --password-stdin $ECR_REGISTRY
-
-          # Stop & remove old container
-          sudo docker stop construction-genai || true
-          sudo docker rm -f construction-genai || true
-
-          # Free port if stuck
-          sudo fuser -k 8501/tcp || true
-
-          # Pull latest image
-          sudo docker pull $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-
-          # Run container
-          sudo docker run -d \
-            -p 8501:8501 \
+          # Login to ECR using instance profile (recommended)
+          aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $ECR_REGISTRY
+          
+          # Stop and remove old container
+          docker stop construction-genai || true
+          docker rm -f construction-genai || true
+          
+          # Pull and run new image
+          docker pull $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker run -d \
             --name construction-genai \
+            -p 8501:8501 \
             --restart unless-stopped \
             $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
         EOF
-
+        
         rm deploy_key
