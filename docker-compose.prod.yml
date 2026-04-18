@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  app:
+    image: ${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}
+    container_name: construction-genai
+    ports:
+      - "8501:8501"
+    restart: unless-stopped
+    environment:
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
