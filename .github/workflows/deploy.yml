@@ -43,4 +43,5 @@ jobs:
               -p 8501:8501 \
               --name construction-genai \
               --restart unless-stopped \
+              -e GOOGLE_API_KEY=${{ secrets.GOOGLE_API_KEY }} \
               ${{ secrets.DOCKER_USERNAME }}/construction-genai
